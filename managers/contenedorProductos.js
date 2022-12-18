@@ -1,5 +1,5 @@
-const fs = require("fs");
-const path = require("path");
+import fs from "fs";
+import path from "path";
 
 class Contenedor{
     constructor(filename){
@@ -90,4 +90,4 @@ class Contenedor{
     }
 }
 
-module.exports = Contenedor;
+export {Contenedor};

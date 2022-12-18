@@ -1,12 +1,11 @@
-const express = require('express');
-// const Contenedor = require("../managers/contenedorProductos");
-const ContenedorSql = require("../managers/contenedorSql");
-const options = require("../config/dbConfig");
+import express from 'express';
+import {ContenedorMysql} from "../managers/contenedorSql.js";
+import {options} from "../config/dbConfig.js";
 
 const router = express.Router();
 
 // const productosApi = new Contenedor("productos.txt");
-const productosApi = new ContenedorSql(options.mariaDB, "products");
+const productosApi = new ContenedorMysql(options.mariaDB, "products");
 
 router.get('/',async(req,res)=>{
     const productos = await productosApi.getAll();
@@ -43,4 +42,4 @@ router.delete('/:id',async(req,res)=>{
 })
 
 
-module.exports = {productsRouter:router};
+export {router};

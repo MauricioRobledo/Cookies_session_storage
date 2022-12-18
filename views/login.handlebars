@@ -1,9 +1,14 @@
-<div>
-    <h1>LOGIN</h1>
-    <form action="/login" method="POST">   
-    <input type="text" id="correo" name="email" placeholder="Correo" required>
-    <input type="text" id="nombre" name="username" placeholder="Nombre" required>
-    <input type="text" id="apellido" name="apellido" placeholder="Apellido" required>
-    <button type="submit" id="loginSend">Login</button>
-</form>
+<h2 class="mx-5 my-2">Formulario Inicio de sesión</h2>
+<div class="mx-5 my-2">
+    {{#if error}}
+        <p>{{error}}</p>
+    {{/if}}
+    <form action="/login" method="POST">
+        <label>Correo:</label>
+        <input class="form-control" type="text" name="email" placeholder="Ingresa tu correo"/>
+        <label>password:</label>
+        <input class="form-control" type="password" name="password" placeholder="Ingresa la contraseña"/>
+        <button type="submit" class="btn btn-info my-3">Iniciar sesión</button>
+    </form>
+    <a href="/signup">Todavía no tienes una cuenta?, registrate</a>
 </div>

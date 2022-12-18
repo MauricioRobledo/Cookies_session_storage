@@ -1,5 +1,5 @@
-const options = require("../config/dbConfig");
-const knex = require("knex");
+import {options} from "../config/dbConfig,js";
+import knex from "knex";
 
 //instancia de la base de datos.
 const dbmysql = knex(options.mariaDB);

@@ -1,25 +1,57 @@
-const express = require('express');
-const options = require("./config/dbConfig");
-const {productsRouter, products} = require('./routes/products');
-const handlebars = require('express-handlebars');
-const {Server} = require("socket.io");
-const {normalize, schema} = require("normalizr");
-const {faker} = require("@faker-js/faker")
-const Contenedor = require("./managers/contenedorProductos");
-const ContenedorChat = require('./managers/contenedorChat');
-const ContenedorSql = require("./managers/contenedorSql");
-const session = require('express-session');
-const cookieParser = require("cookie-parser")
-const mongoStore = require ("connect-mongo")
+import express from 'express';
+import {options} from "./config/dbConfig.js";
+import {router} from './routes/products.js';
+import handlebars from 'express-handlebars';
+import {Server} from "socket.io";
+import {normalize, schema} from "normalizr";
+import {faker} from "@faker-js/faker"
+import {Contenedor} from "./managers/contenedorProductos.js";
+import {ContenedorChat} from './managers/contenedorChat.js';
+import {ContenedorMysql} from "./managers/contenedorSql.js"
+import session  from 'express-session';
+import cookieParser from "cookie-parser"
+import mongoStore from "connect-mongo";
+import passport from "passport"
+import {Strategy as localStrategy} from "passport-local"
+import bcrypt from "bcrypt"
+import mongosee from "mongoose"
+import { UserModel } from './models/user.js';
+import path from 'path';
+import { fileURLToPath} from "url";
+import {config} from "./config/config.js"
+import Yargs from 'yargs';
+import { fork } from 'child_process';
 
-const {commerce, image} = faker
-//service
-// const productosApi = new Contenedor("productos.txt");
-const productosApi = new ContenedorSql(options.mariaDB, "products");
-const chatApi = new ContenedorChat("chat.txt");
-// const chatApi = new ContenedorSql(options.sqliteDB,"chat");
 
-//server
+
+
+const args = Yargs(process.argv.slice(2))
+
+const objArgumentos = args.default({
+    p:8080
+})
+.alias({
+    p:"puerto"
+}).argv
+
+console.log(objArgumentos.p)
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename);
+
+
+const mongoUrl = config.mongoUrl
+const clave = config.clave
+const mongoUrlSessions = config.mongoUrlSessions
+
+mongosee.connect(mongoUrl,{
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+},(error)=>{
+    if (error) return console.log(`Hubo un error conectandose a la base ${error}`)
+    console.log("Conexion exitosa")
+})
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({extended:true}))
@@ -29,6 +61,90 @@ app.use(express.static(__dirname+'/public'))
 app.engine('handlebars', handlebars.engine());
 app.set('views', __dirname+'/views');
 app.set('view engine', 'handlebars');
+
+
+
+app.use(session({
+    store: mongoStore.create({
+        mongoUrl: mongoUrlSessions
+    }),
+    secret: clave,
+    resave: false,
+    saveUninitialized: false,
+    cookie:{
+        maxAge:600000
+    }
+}))
+
+ app.use(cookieParser())
+
+app.use(passport.initialize())
+app.use(passport.session())
+
+passport.serializeUser((user,done)=>{
+    done(null, user.id)
+});
+
+
+passport.deserializeUser((id,done)=>{
+    UserModel.findById(id,(err, userFound)=>{
+        return done(err, userFound)
+    })
+});
+
+const createHash = (password)=>{
+    const hash = bcrypt.hashSync(password,bcrypt.genSaltSync(10));
+    return hash;
+}
+
+passport.use("signupStrategy", new localStrategy(
+    {
+        passReqToCallback: true,
+        usernameField: "email",
+    },
+    (req,username,password,done)=>{
+        UserModel.findOne({username:username},(error,userFound)=>{
+            if(error) return done(error,null,{message:"Hubo un error"})
+            if(userFound) return done(null,null,{message:"El usuario ya existe"})
+            const newUser ={
+                name:req.body.name,
+                username:username,
+                password:createHash(password)
+            }
+            UserModel.create(newUser,(error, userCreated)=>{
+                if(error) return done(error,null,{message:"Error al registrar el usuario"})
+                return done(null,userCreated)
+            })
+        })
+    }
+))
+
+passport.use("loginStrategy", new localStrategy(
+    {
+        usernameField: "email"
+    },
+    (username,password,done)=>{
+        UserModel.findOne({username:username},(error,userFound)=>{
+            if(error) return done(error,null,{message:"Hubo un error"})
+            if (!userFound) return done(null,null,{message:"Error este usuario no existe"})
+            const igual = bcrypt.compareSync(password, userFound.password)
+            console.log(igual)
+            if(!igual){
+                return done(null,null,{message:"Contraseña incorrecta"})
+            }
+            return done(null,userFound)
+        })
+    }
+))
+
+const {commerce, image} = faker
+//service
+// const productosApi = new Contenedor("productos.txt");
+const productosApi = new ContenedorMysql(options.mariaDB, "products");
+const chatApi = new ContenedorChat("chat.txt");
+// const chatApi = new ContenedorSql(options.sqliteDB,"chat");
+
+
 
 //normalizacion
 //creamos los esquemas.
@@ -83,74 +199,108 @@ const calcularPorcentaje = async()=>{
     return result
 }
 
+// // Verificar login
+// const checkUserLogged = (req,res,next)=>{
+//     if(req.session.username){
+//         next();
+//     } else{
+//         res.redirect("/login");
+//     }
+// }
+// Login
 
-
-app.use(session({
-    store: mongoStore.create({
-        mongoUrl:"mongodb+srv://Nicolas:coder1234@coderbackend.bppuxoq.mongodb.net/sessionsDB?retryWrites=true&w=majority"
-    }),
-    secret: "claveSecreta",
-    resave: false,
-    saveUninitialized: false,
-    cookie:{
-        maxAge:600000
-    }
-}))
-
-// Verificar login
-const checkUserLogged = (req,res,next)=>{
-    if(req.session.username){
-        next();
-    } else{
-        res.redirect("/login");
-    }
-}
 
 // routes
 //view routes
-app.get('/', checkUserLogged, async(req,res)=>{
-    res.render('home',{username: req.session.username,
-        porcentaje: await calcularPorcentaje()})
+app.get('/', async(req,res)=>{
+    console.log(req.session)
+    if(req.isAuthenticated()){
+        res.render('home',{porcentaje: await calcularPorcentaje()})
+    } else{
+        res.send("<div>Debes <a href='/login'>inciar sesion</a> o <a href='/signup'>registrarte</a></div>")
+    }
 })
 
-app.get('/productos', checkUserLogged, async(req,res)=>{
+app.get('/productos', async(req,res)=>{
     res.render('products',{products: await productosApi.getAll()})
 })
 
-app.get("/api/productos-test",checkUserLogged, async(req,res)=>{
+app.get("/api/productos-test",async(req,res)=>{
     res.render('products',{
         products: randomProducts()
     })
 })
 
-// Login
-app.use(cookieParser())
 
 //api routes
-app.use('/api/products',productsRouter)
+app.use('/api/products',router)
 
-app.get("/login",(req,res)=>{
-    res.render("login")
+app.get("/signup", (req, res)=>{
+    const errorMessage = req.session.messages ? req.session.messages[0] : '';
+    res.render("signup", {error:errorMessage});
+    req.session.messages = [];
 })
 
-app.post("/login",(req,res)=>{
-    const user = req.body
-    console.log(user)
-    req.session.username = user.username
+app.get("/login",(req,res)=>{
+    const errorMessage = req.session.messages ? req.session.messages[0] : '';
+    res.render("login", {error:errorMessage});
+    req.session.messages = [];
+})
+
+app.post("/signup",passport.authenticate("signupStrategy",{
+    failureRedirect:"/signup",
+    failureMessage:true
+}),(req,res)=>{
     res.redirect("/")
-});
+})
+
+app.post("/login",passport.authenticate("loginStrategy",{
+    successRedirect:"/",
+    failureRedirect:"/login",
+    failureMessage:true
+}))
 
 
 app.get("/logout",(req,res)=>{
-    const username = req.session.username
     req.session.destroy()
     res.redirect("/login")
 })
 
-//express server
-const server = app.listen(8080,()=>{
-    console.log('listening on port 8080')
+// RUTA INFO
+app.get("/info",(req,res)=>{
+    res.send({
+        argumentos: process.argv,
+        plataforma: process.plataform,
+        versionNode: process.versions.node,
+        rss: process.memoryUsage.rss(),
+        path: process.env.npm_execpath,
+        processID: process.pid,
+        carpetaProyecto: process.env.path
+    })
 })
+
+// FORK
+
+app.get("/api/random/:cant",(req,res)=>{
+    const cant = req.params.cant
+    const child = fork("src/child.js")
+    child.on("message",(childMsg)=>{
+        if(childMsg === "listo"){
+            child.send(cant)
+        } else{
+            res.json({resultado: childMsg})
+        }
+    })
+    
+})
+
+console.log(process)
+//express server
+const server = app.listen(objArgumentos.p,()=>{
+    console.log(`Escuchando en puerto ${objArgumentos.p}`)
+})
+
+
 
 
 
