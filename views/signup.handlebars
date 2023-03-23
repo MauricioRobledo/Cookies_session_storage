@@ -6,11 +6,20 @@
     <form action="/signup" method="POST">
         <label>Nombre:</label>
         <input class="form-control" type="text" name="name" placeholder="Ingresa tu nombre"/>
+        <label>Direccion:</label>
+        <input class="form-control" type="text" name="adress" placeholder="Ingresa tu direccion"/>
+        <label>Edad:</label>
+        <input class="form-control" type="number" name="age" placeholder="Ingresa tu edad"/>
+        <label>Numero de telefono:</label>
+        <input class="form-control" type="number" name="phone" placeholder="Ingresa tu numero de telefono"/>
         <label>Correo:</label>
         <input class="form-control" type="text" name="email" placeholder="Ingresa tu correo"/>
         <label>password:</label>
         <input class="form-control" type="password" name="password" placeholder="Ingresa la contraseña"/>
+        <label>Url de foto:</label>
+        <input class="form-control" type="url" name="picture" placeholder="Ingresa el url de tu foto"/>
         <button type="submit" class="btn btn-info my-3">Registrarse</button>
+
     </form>
     <hr>
     <a href="/login">Ya tiene una cuenta?, inicia sesión</a>
